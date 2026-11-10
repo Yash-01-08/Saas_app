@@ -1,8 +1,9 @@
 
 import createHttpError from "http-errors";
 import Notification from "../models/Notification.js";
-
+import { notificationQueue } from "../config/queues.js";
 // Create notification
+
 export const createNotification = async ({
     recipient,
     sender = null,
@@ -14,19 +15,24 @@ export const createNotification = async ({
     workspace = null
 }) => {
     if (!recipient || !type || !message) {
-        throw createHttpError(400, "Recipient, type and message are required");
+        throw createError(400, "Recipient, type and message are required");
     }
 
-    return Notification.create({
-        recipient,
-        sender,
-        type,
-        message,
-        task,
-        project,
-        sprint,
-        workspace
-    });
+    const job = await notificationQueue.add(
+        "create-notification",
+        {
+            recipient,
+            sender,
+            type,
+            message,
+            task,
+            project,
+            sprint,
+            workspace
+        }
+    );
+
+    return job;
 };
 
 // Get notifications for a user

@@ -1,8 +1,10 @@
+
 import createError from "http-errors";
 import Project from "../models/Project.js";
 import Workspace from "../models/Workspace.js";
 import WorkspaceMember from "../models/workspaceMember.js";
 import Membership from "../models/membership.js";
+import { getCache, setCache, deleteCache } from "./cache.service.js";
 
 const verifyWorkspaceAccess = async (workspaceId, userId) => {
     const workspace = await Workspace.findById(workspaceId);
@@ -11,7 +13,6 @@ const verifyWorkspaceAccess = async (workspaceId, userId) => {
         throw createError(404, "Workspace not found");
     }
 
-    // Ensure the user still belongs to the organization
     const organizationMembership = await Membership.findOne({
         organization: workspace.organization,
         user: userId
@@ -66,6 +67,8 @@ export const createProject = async ({
         dueDate
     });
 
+    await deleteCache(`workspace_projects:${workspaceId}`);
+
     return project;
 };
 
@@ -73,9 +76,24 @@ export const createProject = async ({
 export const getWorkspaceProjects = async ({ workspaceId, userId }) => {
     await verifyWorkspaceAccess(workspaceId, userId);
 
-    return Project.find({ workspace: workspaceId })
+    const cacheKey = `workspace_projects:${workspaceId}`;
+
+    const cachedProjects = await getCache(cacheKey);
+
+    if (cachedProjects) {
+        console.log("Projects cache hit");
+        return cachedProjects;
+    }
+
+    console.log("Projects cache miss");
+
+    const projects = await Project.find({ workspace: workspaceId })
         .populate("createdBy", "name username")
         .sort({ createdAt: -1 });
+
+    await setCache(cacheKey, projects, 300);
+
+    return projects;
 };
 
 // GET SINGLE PROJECT
@@ -123,6 +141,8 @@ export const updateProject = async ({
 
     await project.save();
 
+    await deleteCache(`workspace_projects:${project.workspace}`);
+
     return project;
 };
 
@@ -137,6 +157,8 @@ export const deleteProject = async ({ projectId, userId }) => {
     await verifyWorkspaceAdmin(project.workspace, userId);
 
     await project.deleteOne();
+
+    await deleteCache(`workspace_projects:${project.workspace}`);
 
     return { message: "Project deleted successfully" };
 };

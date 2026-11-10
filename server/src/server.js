@@ -1,9 +1,13 @@
-import dotenv from "dotenv";
 
+import dotenv from "dotenv";
 dotenv.config();
+
+import { createServer } from "http";
 
 const { default: app } = await import("./app.js");
 const { connectToMongoDB } = await import("./config/db.js");
+const { default: redis } = await import("./config/redis.js");
+const { initializeSocket } = await import("./config/socket.js");
 
 const PORT = process.env.PORT || 5000;
 
@@ -13,11 +17,24 @@ const startServer = async () => {
 
         await connectToMongoDB();
 
-        app.listen(PORT, () => {
+        const redisResponse = await redis.ping();
+
+        if (redisResponse !== "PONG") {
+            throw new Error("Redis health check failed");
+        }
+
+        console.log("Redis is ready:", redisResponse);
+
+        const httpServer = createServer(app);
+
+        initializeSocket(httpServer);
+
+        httpServer.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);
         });
+
     } catch (error) {
-        console.error("Error starting the server:", error.message);
+        console.error("Server startup failed:", error.message);
         process.exit(1);
     }
 };

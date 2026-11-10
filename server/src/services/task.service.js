@@ -5,6 +5,11 @@ import Task from "../models/Task.js";
 import Project from "../models/Project.js";
 import WorkspaceMember from "../models/workspaceMember.js";
 import { createNotification } from "./notification.service.js";
+import { getCache, setCache, deleteCache } from "./cache.service.js";
+
+// Cache key helper
+const getProjectTasksCacheKey = (projectId) =>
+    `project_tasks:${projectId}`;
 
 // Verify workspace membership
 const verifyWorkspaceMember = async (workspaceId, userId) => {
@@ -64,6 +69,9 @@ export const createTask = async ({
         dueDate: dueDate || null
     });
 
+    // Invalidate task cache
+    await deleteCache(getProjectTasksCacheKey(projectId));
+
     // Notify assigned user
     if (assignedTo && assignedTo.toString() !== userId.toString()) {
         await createNotification({
@@ -90,10 +98,25 @@ export const getProjectTasks = async ({ projectId, userId }) => {
 
     await verifyWorkspaceMember(project.workspace, userId);
 
-    return Task.find({ project: projectId })
+    const cacheKey = getProjectTasksCacheKey(projectId);
+
+    const cachedTasks = await getCache(cacheKey);
+
+    if (cachedTasks) {
+        console.log("Tasks cache hit");
+        return cachedTasks;
+    }
+
+    console.log("Tasks cache miss");
+
+    const tasks = await Task.find({ project: projectId })
         .populate("assignedTo", "name username email")
         .populate("createdBy", "name username")
         .sort({ createdAt: -1 });
+
+    await setCache(cacheKey, tasks, 300);
+
+    return tasks;
 };
 
 // UPDATE TASK
@@ -110,14 +133,12 @@ export const updateTask = async ({
 
     const membership = await verifyWorkspaceMember(task.workspace, userId);
 
-    // Ignore undefined fields
     const validUpdates = Object.fromEntries(
         Object.entries(updates).filter(
             ([, value]) => value !== undefined
         )
     );
 
-    // Members can only update their assigned task's status
     if (
         membership.role !== "admin" &&
         !(
@@ -132,7 +153,6 @@ export const updateTask = async ({
 
     const previousAssignee = task.assignedTo?.toString() || null;
 
-    // Validate new assignee
     if (validUpdates.assignedTo) {
         await verifyWorkspaceMember(
             task.workspace,
@@ -146,9 +166,11 @@ export const updateTask = async ({
 
     await task.save();
 
+    // Invalidate task cache
+    await deleteCache(getProjectTasksCacheKey(task.project));
+
     const newAssignee = task.assignedTo?.toString() || null;
 
-    // Notify only when the assignee changes
     if (
         newAssignee &&
         newAssignee !== previousAssignee &&
@@ -179,6 +201,9 @@ export const deleteTask = async ({ taskId, userId }) => {
     await verifyWorkspaceAdmin(task.workspace, userId);
 
     await task.deleteOne();
+
+    // Invalidate task cache
+    await deleteCache(getProjectTasksCacheKey(task.project));
 
     return {
         message: "Task deleted successfully"

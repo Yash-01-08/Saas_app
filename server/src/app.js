@@ -12,18 +12,22 @@ import taskRoutes from "./routes/task.routes.js";
 import sprintRoutes from "./routes/sprint.routes.js";
 import commentRoutes from "./routes/comment.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
-
+import rateLimiterMiddleware from "./middlewares/rateLimiter.middleware.js";
+import fileRoutes from "./routes/file.routes.js";
 const app = express();
 app.use(express.json());
-        
+
+
+
 app.use(cors({
     origin: process.env.CLIENT_URL,
     credentials: true
 }))
 
+
 app.use(cookieParser());
 
-
+app.use(rateLimiterMiddleware);  
 
 app.get("/api/health", (req, res) => {
     res.json("Hello World!");
@@ -41,7 +45,10 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/sprints", sprintRoutes);
 app.use("/api/comments", commentRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/files", fileRoutes);
+
 
 app.use(notFound);
 app.use(errorHandler);
+
 export default app;
