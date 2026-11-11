@@ -8,7 +8,9 @@ import {
     confirmFileUpload,
     getFileDownloadUrl,
     removeFile,
-    getWorkspaceAttachments
+    getWorkspaceAttachments,
+    getProjectAttachments,
+    getTaskAttachments  
 } from "../controller/files.controller.js";
 
 const router = express.Router();
@@ -27,6 +29,9 @@ router.get(
 router.get("/:fileId/download-url", getFileDownloadUrl);
 
 router.delete("/:fileId", removeFile);
+
+router.get("/project/:projectId", getProjectAttachments);
+router.get("/task/:taskId", getTaskAttachments);
 
 export default router;
     

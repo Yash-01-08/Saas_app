@@ -8,6 +8,10 @@ import {
     deleteFile,
     getWorkspaceFiles
 } from "../services/file.service.js";
+import {
+    getProjectFiles,
+    getTaskFiles
+} from "../services/file.service.js";
 
 // POST /api/files/upload-url
 export const getUploadUrl = asyncHandler(async (req, res) => {
@@ -66,6 +70,33 @@ export const removeFile = asyncHandler(async (req, res) => {
 export const getWorkspaceAttachments = asyncHandler(async (req, res) => {
     const files = await getWorkspaceFiles({
         workspaceId: req.params.workspaceId,
+        userId: req.user._id
+    });
+
+    res.status(200).json({
+        success: true,
+        count: files.length,
+        files
+    });
+});
+
+export const getProjectAttachments = asyncHandler(async (req, res) => {
+    const files = await getProjectFiles({
+        projectId: req.params.projectId,
+        userId: req.user._id
+    });
+
+    res.status(200).json({
+        success: true,
+        count: files.length,
+        files
+    });
+});
+
+
+export const getTaskAttachments = asyncHandler(async (req, res) => {
+    const files = await getTaskFiles({
+        taskId: req.params.taskId,
         userId: req.user._id
     });
 

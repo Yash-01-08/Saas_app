@@ -318,3 +318,35 @@ export const getWorkspaceFiles = async ({
         .populate("uploadedBy", "name username")
         .sort({ createdAt: -1 });
 };
+export const getProjectFiles = async ({ projectId, userId }) => {
+    const project = await Project.findById(projectId);
+
+    if (!project) {
+        throw createError(404, "Project not found");
+    }
+
+    await verifyWorkspaceMember(project.workspace, userId);
+
+    const files = await File.find({ project: projectId })
+        .populate("uploadedBy", "name username")
+        .sort({ createdAt: -1 });
+
+    return files;
+};
+
+
+export const getTaskFiles = async ({ taskId, userId }) => {
+    const task = await Task.findById(taskId);
+
+    if (!task) {
+        throw createError(404, "Task not found");
+    }
+
+    await verifyWorkspaceMember(task.workspace, userId);
+
+    const files = await File.find({ task: taskId })
+        .populate("uploadedBy", "name username")
+        .sort({ createdAt: -1 });
+
+    return files;
+};
